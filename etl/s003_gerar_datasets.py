@@ -32,7 +32,10 @@ schema_pedidos = {
     "DataResposta": str,
     "Resposta": str,
     "Decisao": str,
-    "EspecificacaoDecisao": str
+    "EspecificacaoDecisao": str,
+    "DetalhamentoDecisao": str,
+    "MotivoNegativaAcesso": str,
+    "PrazoRestricaoAcesso": str
 }
 
 usecols_pedidos = [ "IdPedido",
