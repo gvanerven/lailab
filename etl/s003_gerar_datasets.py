@@ -8,16 +8,20 @@ CSV_DATA_DIR=os.path.join(os.path.abspath('.'), 'csvs')
 XML_DATA_DIR=os.path.join(os.path.abspath('.'), 'csvs')
 DATASET_DATA_DIR=os.path.join(os.path.abspath('.'), 'datasets')
 
+type_pedidos = {
+    'ProtocoloPedido': 'str'
+}
 
-patterns = [#("pedidos", re.compile(r".*\_pedidos\_.*\.csv")), 
-            ("recursos", re.compile(r".*\_recursos\_.*\.csv")), 
+
+patterns = [("pedidos", re.compile(r".*\_pedidos\_.*\.csv"), type_pedidos), 
+            ("recursos", re.compile(r".*\_recursos\_.*\.csv"), None), 
             #("solicitantes", re.compile(r".*\_solicitantes\_.*\.csv"), schema_pedidos, usecols_pedidos), 
             #("pedidos_link_arquivos", re.compile(r".*\_pedidoslinkarquivo\_.*\.csv"), None, None, None), 
             #("recursos_link_arquivos", re.compile(r".*\_recursoslinkarquivo\_.*\.csv"), None, None, None)
             ]
 
 
-def carrega_arquivos_csv_df(diretorio, pattern):
+def carrega_arquivos_csv_df(diretorio, pattern, types=None):
         df = pd.DataFrame()
         files = os.listdir(diretorio)
         files.sort(reverse=True)
@@ -37,7 +41,11 @@ def carrega_arquivos_csv_df(diretorio, pattern):
                 input = StringIO(cleaned_content)
 
                 #aux = pd.read_csv(os.path.join(diretorio, file), sep=';', encoding='utf-16', on_bad_lines='warn', usecols=usecols_pedidos, dtype=schema)
-                aux = pd.read_csv(input, sep=';', on_bad_lines='warn')
+                if types != None:
+                    aux = pd.read_csv(input, sep=';', on_bad_lines='warn', dtype=types)
+                else:
+                    aux = pd.read_csv(input, sep=';', on_bad_lines='warn')
+
                 df = pd.concat([df, aux], axis=0)
                 print(f'Carregado, memória utilizada após carga: {round(df.memory_usage(deep=True).sum()/(1024*1024), 2)}MB')
         return df
@@ -45,7 +53,7 @@ def carrega_arquivos_csv_df(diretorio, pattern):
 
 def cria_datasets():
     for pattern in patterns:
-        df = carrega_arquivos_csv_df(CSV_DATA_DIR, pattern[1])
+        df = carrega_arquivos_csv_df(CSV_DATA_DIR, pattern[1], pattern[2])
         df.to_parquet(os.path.join(DATASET_DATA_DIR, f"{pattern[0]}_lai.parquet"), index=False)
         print(f"DF Shape: {df.shape}")
         ds = Dataset.from_pandas(df)
