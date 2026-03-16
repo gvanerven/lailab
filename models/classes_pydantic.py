@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class RegistroPedido(BaseModel):
     protocoloPedido: str
@@ -12,10 +12,11 @@ class RegistroPedido(BaseModel):
     resposta: str
     decisao: str
     detalhamentoDecisao: str
-    motivoNegativaAcesso: str
+    motivoNegativaAcesso: Optional[str] = None
+
 
 class ResumoPedido(BaseModel):
-    lide: str
+    tema: str
     resumo: str
-    entidades: str
+    entidades: List[str]
     proposicoes: List[str]

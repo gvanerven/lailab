@@ -208,7 +208,7 @@ __marimo__/
 
 etl/csvs/*
 etl/zips/*
-etl/xml/*
+etl/xmls/*
 etl/datasets/*
 
 .env

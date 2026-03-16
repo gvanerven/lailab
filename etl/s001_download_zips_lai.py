@@ -6,7 +6,7 @@ import time
 
 
 ANO_INICIO=2015
-FORMATO='csv'
+FORMATO='xml'
 PREFIXO_ACESSO = "Pedidos"
 PREFIXO_RECURSO = "Recursos_Reclamacoes"
 ZIP_DATA_DIR=os.path.join(os.path.abspath('.'), 'zips')
