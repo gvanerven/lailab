@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 class RegistroPedido(BaseModel):
+    idPedido: int
     protocoloPedido: str
     orgaoDestinatario: str
     resumoSolicitacao: str 
