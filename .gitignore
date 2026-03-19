@@ -210,5 +210,6 @@ etl/csvs/*
 etl/zips/*
 etl/xmls/*
 etl/datasets/*
+resumos/*
 
 .env

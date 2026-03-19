@@ -48,6 +48,7 @@ def carrega_arquivos_df(diretorio, pattern, types=None):
                 else:
                     aux = pd.read_xml(input, encoding='utf-16')
 
+                aux['Ano'] = aux['DataRegistro'].apply(lambda a: a[-4:])
                 df = pd.concat([df, aux], axis=0)
                 print(f'Carregado, memória utilizada após carga: {round(df.memory_usage(deep=True).sum()/(1024*1024), 2)}MB')
         return df
