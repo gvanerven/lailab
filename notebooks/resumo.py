@@ -2,23 +2,45 @@
 import pandas as pd
 import sys
 
-
 sys.path.append('/home1/gvanerven/code/lailab')
 from models.classes_pydantic import RegistroPedido, ResumoPedidoSimples
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers.generation import GenerationConfig
 import torch
+import torch.distributed as dist
 
 from tqdm import tqdm
 import json
 import logging
 
 
+#if torch.distributed.is_available() and not torch.distributed.is_initialized():
+#    # Initialize the process group
+#    dist.init_process_group("nccl")
+
+
+
 # %%
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+torch.set_float32_matmul_precision('high')
+
 model_id = "Qwen/Qwen3-8B"
+#model_id = "Qwen/Qwen3-4B-Instruct-2507"
+
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    device_map="auto",
+    #tp_plan="auto",
+    trust_remote_code=True,
+    #attn_implementation="flash_attention_2",
+    dtype=torch.bfloat16
+).eval()
+
 
 sel_cols = ['IdPedido', 
             'Ano',
@@ -39,7 +61,9 @@ ANO = sys.argv[1]
 
 # %%
 df = pd.read_parquet('/home1/gvanerven/code/lailab/etl/datasets/pedidos_lai.parquet', columns=sel_cols, filters=[('Ano', '==', ANO)])
+df = df.fillna('')
 print(f"DF Shape: {df.shape}")
+
 
 # %%
 pedidos = []
@@ -49,6 +73,15 @@ for _, row in df.iterrows():
 assert df.shape[0] == len(pedidos)
 
 del df
+
+#rank = dist.get_rank()
+#world_size = dist.get_world_size()
+
+#print(rank)
+#print(world_size)
+
+#exit()
+
 # %%
 system_prompt = f"""
 Você é um Analista de Pedidos de Acesso à Informação e deve realizar tarefas de consolidação de informações de um pedido de acesso à informação.
@@ -80,19 +113,9 @@ Extraia as informações do pedido de acesso à informação do usuário delimit
 """
 
 
-# %%
-tokenizer = AutoTokenizer.from_pretrained(model_id)
-
-model = AutoModelForCausalLM.from_pretrained(
-    model_id,
-    device_map="auto",
-    trust_remote_code=True,
-    dtype=torch.bfloat16
-).eval()
-
 
 # %%
-batch_size = 1
+batch_size = 16
 resumos_final = []
 for i in tqdm(range(0, len(pedidos), batch_size)):
     resumos = []
@@ -114,24 +137,42 @@ for i in tqdm(range(0, len(pedidos), batch_size)):
             messages,
             tokenize=False,
             add_generation_prompt=True,
-            temperature = 0.01,
+            #temperature = 0.01,
             enable_thinking=False
         )
         batch.append(text)
     
     inputs = tokenizer(batch, return_tensors="pt", padding=True, truncation=True, padding_side='left').to(model.device)
 
+    #generation_config = GenerationConfig(
+    #    max_new_tokens=4096,
+    #    use_cache=True,
+    #    cache_implementation="static",
+    #    eos_token_id=tokenizer.eos_token_id,
+    #    pad_token_id=tokenizer.pad_token_id,
+    #    do_sample=False,
+        #max_batch_tokens=batch_size*4096,
+    #)
     generated_ids = model.generate(
         **inputs,
         use_cache=True,
-        max_new_tokens=1024
+        do_sample=False,
+        max_new_tokens=4096
     )
 
+    #outputs = model.generate_batch(
+    #    inputs=inputs,
+    #    generation_config=generation_config,
+    #)
+
     for gen_id in generated_ids:
+    #for request_id, output in outputs.items():
         output_ids = gen_id[len(inputs.input_ids[0]):].tolist()
         content = tokenizer.decode(output_ids, skip_special_tokens=True)
+        #content = tokenizer.decode(output.generated_tokens, skip_special_tokens=True)
         try:
             aux = ResumoPedidoSimples(**json.loads(content)).model_dump()
+            #aux['request_id'] = request_id
             #resumos.append(aux)
             resumos_final.append(aux)
 
@@ -143,15 +184,6 @@ for i in tqdm(range(0, len(pedidos), batch_size)):
         tmp_df = pd.DataFrame(resumos_final)
         tmp_df.to_parquet(f"/home1/gvanerven/code/lailab/resumos/pedidos_resumos_tmp_df_batch{i}_{ANO}.parquet", index=False)
     
-# mi2104x - batch 48 18:47 min
-# mi2104x - batch 48 04:16 min
-# mi2104x - batch  8 01:56 min
-# mi2104x - batch  8 31 s
-# mi2104x - batch  32 1:58 s
-# mi2104x - batch  4 01:12 min
-# mi2508x - batch 48 18:47 min
-# mi2508x - batch 32 09:49 min
-# mi2508x - batch  8 01:46 min
 
 # %%
 final_df = pd.DataFrame(resumos_final)
